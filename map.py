@@ -1,33 +1,30 @@
 import streamlit as st
 from streamlit_folium import st_folium
 import folium
+from folium.plugins import MarkerCluster, MeasureControl, HeatMap
 import pandas as pd
 
-st.title("인터랙티브 지도 데모 (Folium+Streamlit)")
+st.title("프로 지도앱: 클러스터+거리재기+히트맵")
 
-# 샘플 데이터 (서울 명소)
+# 샘플 데이터 (대충 서울시내 100개)
 data = pd.DataFrame({
-    '장소': ['경복궁', 'N서울타워', '롯데월드타워', '여의도공원'],
-    '위도': [37.579617, 37.551169, 37.513068, 37.528311],
-    '경도': [126.977041, 126.988227, 127.102492, 126.924921]
+    "장소": [f"spot{i}" for i in range(100)],
+    "위도": 37.55 + 0.05 * np.random.rand(100),
+    "경도": 126.90 + 0.07 * np.random.rand(100)
 })
 
-# 지도 생성(초기 중심: 서울시청)
-m = folium.Map(location=[37.5665, 126.9780], zoom_start=12, tiles='CartoDB positron')
+# 지도 생성
+m = folium.Map(location=[37.57, 126.98], zoom_start=11, tiles='Stamen Terrain')
 
-# 마커 추가
+# [1] 클러스터 추가
+cluster = MarkerCluster().add_to(m)
 for _, row in data.iterrows():
-    folium.Marker(
-        location=[row['위도'], row['경도']],
-        popup=row['장소'],
-        tooltip=row['장소'],
-        icon=folium.Icon(color='blue', icon='info-sign')
-    ).add_to(m)
+    folium.Marker([row['위도'], row['경도']], popup=row['장소']).add_to(cluster)
 
-# streamlit에서 folium 지도 표시(마커 클릭도 interactivity)
-st.write("### 마커를 클릭하면 팝업이 나옵니다")
-st_data = st_folium(m, width=700, height=500)
+# [2] 거리/면적 재기
+m.add_child(MeasureControl())
 
-# 지도 클릭시 좌표 출력 (진짜 지도답게 interactivity!)
-if st_data and st_data.get("last_clicked"):
-    st.write("**지도 클릭 좌표:**", st_data["last_clicked"])
+# [3] 히트맵 추가
+HeatMap(data[["위도", "경도"]], radius=15, blur=7, min_opacity=0.2).add_to(m)
+
+st_folium(m, width=800, height=600)
