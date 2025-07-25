@@ -1,48 +1,62 @@
+# app.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(layout="wide")
+# ————————————————————————————————
+# 1) GitHub raw URL 설정
+#    자신의 레포(raw) URL로 바꿔주세요!
+URL_TOTAL = "https://raw.githubusercontent.com/USERNAME/REPO/main/계.csv"
+URL_MF    = "https://raw.githubusercontent.com/USERNAME/REPO/main/남여구분.csv"
 
-st.sidebar.title("데이터 선택")
-dataset = st.sidebar.selectbox("👀 볼 데이터", ["계", "남여구분"])
+# 2) 데이터 로드
+df_total = pd.read_csv(URL_TOTAL, encoding='cp949')
+df_mf    = pd.read_csv(URL_MF,    encoding='cp949')
 
-if dataset == "계":
-    # 전체 인구 데이터 불러오기
-    df = pd.read_csv("계.csv", encoding="cp949")
-    # '총인구수' 컬럼 자동 탐색 및 숫자 변환
-    tot_col = [c for c in df.columns if "총인구수" in c][0]
-    df["총인구수"] = df[tot_col].str.replace(",", "").astype(int)
-    # 지역명 컬럼 (대부분 두번째 컬럼)
-    region_col = df.columns[1]
-    # Plotly 막대그래프
-    fig = px.bar(
-        df,
-        x=region_col,
-        y="총인구수",
-        title="전국/광역지자체별 총인구수",
-        labels={region_col: "지역", "총인구수": "총인구수 (명)"}
-    )
-    fig.update_layout(xaxis_tickangle=-45, margin=dict(t=50, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+# 3) 연령 컬럼이 문자열이라면 정수형으로 변환 (optional)
+df_total['연령'] = df_total['연령'].astype(int)
+df_mf   ['연령'] = df_mf   ['연령'].astype(int)
 
-else:
-    # 남녀 구분 데이터 불러오기
-    df = pd.read_csv("남여구분.csv", encoding="cp949")
-    # '남자', '여자' 컬럼 자동 탐색 및 숫자 변환
-    male_col = [c for c in df.columns if "남자" in c][0]
-    female_col = [c for c in df.columns if "여자" in c][0]
-    df["남자인구"] = df[male_col].str.replace(",", "").astype(int)
-    df["여자인구"] = df[female_col].str.replace(",", "").astype(int)
-    region_col = df.columns[1]
-    # 그룹 바차트
-    fig = px.bar(
-        df,
-        x=region_col,
-        y=["남자인구", "여자인구"],
-        barmode="group",
-        title="전국/광역지자체별 남녀 인구수",
-        labels={region_col: "지역", "value": "인구수 (명)", "variable": "성별"}
-    )
-    fig.update_layout(xaxis_tickangle=-45, margin=dict(t=50, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+# 4) Streamlit 레이아웃
+st.title("🧮 연령별 인구 현황")
+
+# ————————————————————————————————
+# 5) 총인구수 그래프
+st.subheader("연령별 총인구수")
+fig_total = px.bar(
+    df_total,
+    x="연령",
+    y="계",
+    labels={"연령":"연령 (세)", "계":"총인구수"},
+    title="2025년 6월 연령별 총인구수"
+)
+fig_total.update_layout(xaxis_tickmode="linear")
+st.plotly_chart(fig_total, use_container_width=True)
+
+# ————————————————————————————————
+# 6) 성별(남/여) 인구수 그래프
+st.subheader("연령별 성별 인구수")
+# melt 해서 long-form으로 변환
+df_m = df_mf.melt(
+    id_vars="연령",
+    value_vars=["남", "여"],
+    var_name="성별",
+    value_name="인구수"
+)
+fig_mf = px.bar(
+    df_m,
+    x="연령",
+    y="인구수",
+    color="성별",
+    barmode="group",
+    labels={"연령":"연령 (세)", "인구수":"인구수", "성별":"성별"},
+    title="2025년 6월 연령별 남녀 인구 비교"
+)
+fig_mf.update_layout(xaxis_tickmode="linear")
+st.plotly_chart(fig_mf, use_container_width=True)
+
+# ————————————————————————————————
+# 7) 상세 데이터 보기
+if st.checkbox("원본 데이터 보기"):
+    st.write("■ 연령별 총인구수", df_total)
+    st.write("■ 연령별 남여구분", df_mf)
