@@ -1,1 +1,3 @@
 plotly
+streamlit_folium
+pandas
