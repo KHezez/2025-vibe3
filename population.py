@@ -2,9 +2,22 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.title("📈 CSV/ITEM/TSV 데이터 자동 시각화 대시보드")
+st.title("📊 CSV/ITEM/TSV 데이터 자동 인코딩+시각화 대시보드")
 
-file = st.file_uploader("데이터 파일 업로드", type=["csv","tsv","item","dat"])
+file = st.file_uploader("데이터 파일 업로드", type=["csv", "tsv", "item", "dat"])
+
+def smart_read_csv(file, sep=',', header='infer', names=None, nrows=None):
+    for enc in ['utf-8', 'cp949', 'euc-kr', 'latin1']:
+        try:
+            df = pd.read_csv(file, sep=sep, encoding=enc, header=header, names=names, nrows=nrows)
+            return df
+        except UnicodeDecodeError:
+            file.seek(0)
+            continue
+        except Exception as e:
+            file.seek(0)
+            continue
+    raise Exception("지원하는 인코딩이 없습니다!")
 
 if file:
     # 구분자 자동 추정
@@ -21,13 +34,12 @@ if file:
     # 헤더 유무
     header_opt = st.radio("첫 줄이 헤더(컬럼명)?", ["예", "아니오"], horizontal=True)
     if header_opt == "예":
-        df = pd.read_csv(file, sep=sep, encoding='utf-8')
+        df = smart_read_csv(file, sep=sep)
     else:
-        # 임시 헤더 + 직접 입력
-        preview = pd.read_csv(file, sep=sep, encoding='utf-8', nrows=1, header=None)
+        preview = smart_read_csv(file, sep=sep, header=None, nrows=1)
         st.write("첫 줄 미리보기:", preview)
         cols = st.text_input("컬럼명 콤마(,)로 입력", ",".join([f"col{i+1}" for i in range(len(preview.columns))]))
-        df = pd.read_csv(file, sep=sep, names=cols.split(','), encoding='utf-8')
+        df = smart_read_csv(file, sep=sep, header=None, names=cols.split(','))
 
     st.dataframe(df.head(30))
 
@@ -36,29 +48,31 @@ if file:
     nonnum_cols = df.select_dtypes(exclude='number').columns.tolist()
 
     # 1. 히스토그램(숫자열)
-    st.subheader("히스토그램 / 분포")
-    col1 = st.selectbox("분포 볼 컬럼(숫자형)", numeric_cols)
-    if col1:
-        fig, ax = plt.subplots()
-        ax.hist(df[col1].dropna(), bins=20, color='deepskyblue', edgecolor='gray')
-        ax.set_xlabel(col1)
-        ax.set_ylabel("빈도")
-        st.pyplot(fig)
+    if numeric_cols:
+        st.subheader("히스토그램 / 분포")
+        col1 = st.selectbox("분포 볼 컬럼(숫자형)", numeric_cols)
+        if col1:
+            fig, ax = plt.subplots()
+            ax.hist(df[col1].dropna(), bins=20, color='deepskyblue', edgecolor='gray')
+            ax.set_xlabel(col1)
+            ax.set_ylabel("빈도")
+            st.pyplot(fig)
 
     # 2. x/y 산점도
-    st.subheader("x/y 산점도 (모두 숫자형만)")
-    colx = st.selectbox("x축", numeric_cols, key="xscat")
-    coly = st.selectbox("y축", numeric_cols, key="yscat")
-    if colx and coly:
-        fig2, ax2 = plt.subplots()
-        ax2.scatter(df[colx], df[coly], alpha=0.5, color='orange')
-        ax2.set_xlabel(colx)
-        ax2.set_ylabel(coly)
-        st.pyplot(fig2)
+    if len(numeric_cols) >= 2:
+        st.subheader("x/y 산점도 (숫자형만)")
+        colx = st.selectbox("x축", numeric_cols, key="xscat")
+        coly = st.selectbox("y축", numeric_cols, key="yscat")
+        if colx and coly:
+            fig2, ax2 = plt.subplots()
+            ax2.scatter(df[colx], df[coly], alpha=0.5, color='orange')
+            ax2.set_xlabel(colx)
+            ax2.set_ylabel(coly)
+            st.pyplot(fig2)
 
     # 3. 막대그래프 (카테고리형)
-    st.subheader("카테고리별 평균/빈도 막대그래프")
     if nonnum_cols and numeric_cols:
+        st.subheader("카테고리별 평균/빈도 막대그래프")
         cat = st.selectbox("카테고리(문자/범주형)", nonnum_cols)
         val = st.selectbox("값(숫자형)", numeric_cols, key="barval")
         mode = st.radio("표시방식", ["평균값", "빈도수"])
@@ -87,4 +101,4 @@ if file:
     st.markdown("---")
     st.write("필요한 분석/그래프 추가 요청 OK! 파일이 안맞으면 미리보기 붙여주면 완전 맞춤으로 해줄 수 있음.")
 else:
-    st.info("csv/item/tsv 파일을 업로드하면 자동 시각화 기능을 쓸 수 있습니다!")
+    st.info("csv/item/tsv/dat 파일을 업로드하면 자동 시각화 기능을 쓸 수 있습니다!")
