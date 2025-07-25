@@ -6,8 +6,8 @@ import plotly.express as px
 # ————————————————————————————————
 # 1) GitHub raw URL 설정
 #    자신의 레포(raw) URL로 바꿔주세요!
-URL_TOTAL = "https://raw.githubusercontent.com/USERNAME/REPO/main/계.csv"
-URL_MF    = "https://raw.githubusercontent.com/USERNAME/REPO/main/남여구분.csv"
+URL_TOTAL = "https://github.com/KHezez/2025-vibe3/blob/main/%EA%B3%84.csv"
+URL_MF    = "https://raw.githubusercontent.com/USERNAME/blob/main/남여구분.csv"
 
 # 2) 데이터 로드
 df_total = pd.read_csv(URL_TOTAL, encoding='cp949')
