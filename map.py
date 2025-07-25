@@ -1,30 +1,34 @@
 import streamlit as st
-from streamlit_folium import st_folium
-import folium
-from folium.plugins import MarkerCluster, MeasureControl, HeatMap
 import pandas as pd
+import folium
+from streamlit_folium import st_folium
+import plotly.express as px
 
-st.title("프로 지도앱: 클러스터+거리재기+히트맵")
-
-# 샘플 데이터 (대충 서울시내 100개)
-data = pd.DataFrame({
-    "장소": [f"spot{i}" for i in range(100)],
-    "위도": 37.55 + 0.05 * np.random.rand(100),
-    "경도": 126.90 + 0.07 * np.random.rand(100)
+# 예제 데이터
+df = pd.DataFrame({
+    '장소': ['A', 'B', 'C'],
+    '위도': [37.5, 37.6, 37.65],
+    '경도': [127.0, 127.1, 127.05]
 })
 
-# 지도 생성
-m = folium.Map(location=[37.57, 126.98], zoom_start=11, tiles='Stamen Terrain')
+# 각 장소별 방문 데이터 (임의)
+visit = {
+    'A': [10, 23, 45, 21],
+    'B': [5, 31, 15, 9],
+    'C': [19, 8, 30, 12]
+}
+hours = ["09시", "12시", "15시", "18시"]
 
-# [1] 클러스터 추가
-cluster = MarkerCluster().add_to(m)
-for _, row in data.iterrows():
-    folium.Marker([row['위도'], row['경도']], popup=row['장소']).add_to(cluster)
+m = folium.Map(location=[37.6, 127.05], zoom_start=11)
+for i, row in df.iterrows():
+    folium.Marker(
+        [row['위도'], row['경도']],
+        popup=f"<b>{row['장소']}</b>",
+        tooltip=row['장소'],
+    ).add_to(m)
 
-# [2] 거리/면적 재기
-m.add_child(MeasureControl())
+st.write("지도에서 마커 클릭 후, 아래에서 해당 장소를 선택하면 시간별 그래프가 나옵니다.")
+st_data = st_folium(m, width=700, height=500)
 
-# [3] 히트맵 추가
-HeatMap(data[["위도", "경도"]], radius=15, blur=7, min_opacity=0.2).add_to(m)
-
-st_folium(m, width=800, height=600)
+selected = st.selectbox("장소 선택", df['장소'])
+st.plotly_chart(px.bar(x=hours, y=visit[selected], labels={'x':'시간', 'y':'방문자수'}, title=f"{selected} 시간별 방문자수"))
