@@ -1,58 +1,60 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide")
-st.title("인구 피라미드 대시보드")
+st.title("🎬 영화 평점/흥행 대시보드")
 
-남여 = st.file_uploader("남여구분.csv 업로드", type="csv")
-합계 = st.file_uploader("계.csv 업로드 (선택)", type="csv")
+# 1. 파일 업로드
+uploaded_file = st.file_uploader("영화 데이터(.csv) 파일을 업로드하세요", type="csv")
 
-if 남여:
-    df = pd.read_csv(남여)
-    st.write("데이터 미리보기", df.head())
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-    # 컬럼명 자동 감지
-    colnames = df.columns.tolist()
-    region_col = [c for c in colnames if "시" in c or "구" in c or "군" in c or "지역" in c][0]
-    age_col = [c for c in colnames if "세" in c or "연령" in c][0]
-    male_col = [c for c in colnames if "남" in c][0]
-    female_col = [c for c in colnames if "여" in c][0]
+    # 2. 장르/연도 필터
+    all_genres = sorted(set(sum([str(g).split(', ') for g in df['genre'].dropna()], [])))
+    sel_genres = st.multiselect("장르 선택", all_genres, default=all_genres[:3])
+    sel_years = st.slider("연도 범위", int(df['year'].min()), int(df['year'].max()), (2000, 2023))
 
-    # 시군구(지역) 선택
-    regions = df[region_col].unique().tolist()
-    selected = st.selectbox("지역 선택", regions)
+    # 3. 필터 적용
+    filtered = df[
+        df['year'].between(*sel_years) &
+        df['genre'].apply(lambda g: any(gen in str(g) for gen in sel_genres))
+    ]
 
-    # 해당 지역 필터
-    dff = df[df[region_col] == selected].copy()
-    dff = dff.sort_values(age_col)
+    st.write(f"선택된 영화 수: {len(filtered)}")
 
-    # 피라미드용 데이터 추출
-    age = dff[age_col].astype(str)
-    male = -dff[male_col].astype(int)   # 왼쪽(음수)로
-    female = dff[female_col].astype(int)  # 오른쪽(양수)로
+    # 4. 평점 분포 (히스토그램)
+    st.subheader("평점 분포")
+    fig, ax = plt.subplots()
+    ax.hist(filtered['rating'].dropna(), bins=20, color='skyblue', edgecolor='gray')
+    ax.set_xlabel("평점")
+    ax.set_ylabel("영화 수")
+    st.pyplot(fig)
 
-    # 피라미드 그리기
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=age, x=male, name="남자", orientation="h", marker_color="#1f77b4"
-    ))
-    fig.add_trace(go.Bar(
-        y=age, x=female, name="여자", orientation="h", marker_color="#FFB6C1"
-    ))
-    fig.update_layout(
-        barmode="relative",
-        title=f"{selected} 연령대별 인구 피라미드",
-        xaxis=dict(title="인구수", tickvals=[min(male), 0, max(female)]),
-        yaxis=dict(title="연령대"),
-        height=600,
-        plot_bgcolor="white",
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    # 5. TOP 10 평점 영화
+    st.subheader("TOP 10 평점 영화")
+    top10 = filtered.sort_values('rating', ascending=False).head(10)
+    st.dataframe(top10[['title', 'year', 'genre', 'rating', 'revenue_millions']])
 
-    # 계.csv도 참고로 보여줌
-    if 합계:
-        df_sum = pd.read_csv(합계)
-        st.write("계.csv 미리보기", df_sum.head())
+    # 6. TOP 5 수익 영화
+    st.subheader("TOP 5 흥행 영화 (수익)")
+    top5_rev = filtered.sort_values('revenue_millions', ascending=False).head(5)
+    st.dataframe(top5_rev[['title', 'year', 'revenue_millions', 'rating']])
+
+    # 7. 연도별 평균 평점 (트렌드)
+    st.subheader("연도별 평균 평점")
+    trend = filtered.groupby('year')['rating'].mean()
+    fig2, ax2 = plt.subplots()
+    trend.plot(ax=ax2, marker='o', color='orange')
+    ax2.set_ylabel("평균 평점")
+    ax2.set_xlabel("연도")
+    st.pyplot(fig2)
+
+    # 8. 원하는 영화명 검색
+    st.subheader("영화명으로 검색")
+    keyword = st.text_input("영화 제목의 일부를 입력하세요")
+    if keyword:
+        res = filtered[filtered['title'].str.contains(keyword, case=False, na=False)]
+        st.dataframe(res[['title', 'year', 'genre', 'rating', 'revenue_millions']])
 else:
-    st.info("남여구분.csv 파일을 업로드하세요.")
+    st.info("예시용 csv 샘플: [movies_metadata.csv 다운로드](https://raw.githubusercontent.com/justmarkham/DAT8/master/data/u.item)")
